@@ -1,0 +1,68 @@
+name: Abloh
+on:
+  pull_request:
+
+jobs:
+  abloh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # short-lived identity for the abloh model gateway
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # abloh diffs against the base ref
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .tool-versions # the Node .tool-versions declares
+      # bun 1.3.14 on PATH: bun.lock selects bun, which the Node proof image does not carry.
+      - name: install pinned bun 1.3.14 without root
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$HOME/.abloh-runtime/bun" bun@1.3.14
+          echo "$HOME/.abloh-runtime/bun/node_modules/.bin" >> "$GITHUB_PATH"
+          "$HOME/.abloh-runtime/bun/node_modules/.bin/bun" --version || { echo "abloh asked for bun 1.3.14 and it is not runnable at $HOME/.abloh-runtime/bun/node_modules/.bin/bun. The setup steps that need it would have failed as if your repository were wrong."; exit 1; }
+      # deno 2.7.11 on PATH: package.json runs deno in scripts.test:deno, which the Node proof image does not carry.
+      - name: install pinned deno 2.7.11 without root
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$HOME/.abloh-runtime/deno" deno@2.7.11
+          echo "$HOME/.abloh-runtime/deno/node_modules/.bin" >> "$GITHUB_PATH"
+          "$HOME/.abloh-runtime/deno/node_modules/.bin/deno" --version || { echo "abloh asked for deno 2.7.11 and it is not runnable at $HOME/.abloh-runtime/deno/node_modules/.bin/deno. The setup steps that need it would have failed as if your repository were wrong."; exit 1; }
+      - name: check every pinned runtime abloh installed is still on PATH
+        run: |
+          [ "$(command -v bun)" = "$HOME/.abloh-runtime/bun/node_modules/.bin/bun" ] && bun --version >/dev/null 2>&1 || { echo "abloh installed bun 1.3.14 for this job and it is not on PATH at $HOME/.abloh-runtime/bun/node_modules/.bin/bun now. abloh's own runtime setup for this job did not hold. The setup steps that need it would have failed as if your repository were wrong."; exit 1; }
+          [ "$(command -v deno)" = "$HOME/.abloh-runtime/deno/node_modules/.bin/deno" ] && deno --version >/dev/null 2>&1 || { echo "abloh installed deno 2.7.11 for this job and it is not on PATH at $HOME/.abloh-runtime/deno/node_modules/.bin/deno now. abloh's own runtime setup for this job did not hold. The setup steps that need it would have failed as if your repository were wrong."; exit 1; }
+      # Your build, whole, from the one file that holds it: .abloh/setup.sh.
+      # The step below runs it, inside Abloh, before anything is measured. Edit that file,
+      # not this workflow - and a step of it that fails is reported as a failed step of yours,
+      # by number, on your pull request, rather than as a shell error in this job's log.
+      - uses: kkennethlau12393/abloh-action-census@fd610136b8cd7732adad0f21e3420b5c0d6f21c3
+        with:
+          # ADDED BY THE ABLOH FIRST-CONTACT CENSUS: this run measures a build of the product
+          # rather than the published CLI. Recorded in every row this workflow produced.
+          cli-tarball: .abloh-census/engine/abloh-cli-0.1.4.tgz .abloh-census/engine/abloh-aster-0.1.0.tgz .abloh-census/engine/abloh-core-0.1.3.tgz .abloh-census/engine/abloh-marigold-0.1.0.tgz .abloh-census/engine/abloh-measure-0.1.0.tgz .abloh-census/engine/abloh-repository-0.1.0.tgz .abloh-census/engine/abloh-triage-0.1.2.tgz
+          base: ${{ github.event.pull_request.base.sha }}
+      # ---------------------------------------------------------------------------------
+      # ADDED BY THE ABLOH FIRST-CONTACT CENSUS, and these are the only lines of this file
+      # that are not what `abloh init` wrote. It keeps the run's own artifact so the
+      # census can classify from evidence rather than from this job's log. It runs after
+      # everything Abloh does and cannot reach what was measured.
+      # ---------------------------------------------------------------------------------
+      - name: census - keep the run artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: abloh-census-evidence-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/abloh-evidence-manifest.json
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/abloh-run.json
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/attest-results.json
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/attest-summary.md
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/abloh-proposals-proofs.json
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/abloh-sweep.json
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/abloh-sweep-summary.json
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/abloh-sweep-preceding-refusal.json
+            ${{ runner.temp }}/abloh/${{ github.run_id }}-${{ github.run_attempt }}/abloh-refusal.json
+          if-no-files-found: ignore
+          retention-days: 30

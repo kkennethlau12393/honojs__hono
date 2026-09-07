@@ -1,0 +1,22 @@
+# abloh.yml - read from the PR merge base, so changes are reviewed like code.
+# Keys: https://abloh.dev/docs#config
+
+# % of mechanical breaks in changed lines your tests must catch.
+threshold: 70
+
+# true: below threshold fails the check. Blocks merges only if also marked
+# required in branch protection.
+enforce: true
+
+# Rebuild recipe for the proof container. Comments name the source file.
+environment:
+  runtimeImage: node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d # reviewed Node 24 image (.tool-versions, node >=16.9.0 in package.json)
+  runtimes: # pinned runtimes added to the proof image, installed at build time
+    # bun.lock selects bun, which the Node proof image does not carry
+    - bun
+    # package.json runs deno in scripts.test:deno, which the Node proof image does not carry
+    - deno
+  installDirectory: .
+  setup: .abloh/setup.sh # written by init and yours to edit. Every cold run executes it step by step
+  testCommand: bun run test # scripts.test in package.json
+  sealedTestCommand: npx --no-install vitest run --reporter=json # runs vitest alone; scripts.test is gated by tsc
