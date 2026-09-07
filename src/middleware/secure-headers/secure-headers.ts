@@ -182,10 +182,7 @@ export const secureHeaders = (customOptions?: SecureHeadersOptions): MiddlewareH
   const callbacks: SecureHeadersCallback[] = []
 
   if (options.contentSecurityPolicy) {
-    const [callback, value] = getCSPDirectives(
-      options.contentSecurityPolicy,
-      'Content-Security-Policy'
-    )
+    const [callback, value] = getCSPDirectives(options.contentSecurityPolicy)
     if (callback) {
       callbacks.push(callback)
     }
@@ -193,10 +190,7 @@ export const secureHeaders = (customOptions?: SecureHeadersOptions): MiddlewareH
   }
 
   if (options.contentSecurityPolicyReportOnly) {
-    const [callback, value] = getCSPDirectives(
-      options.contentSecurityPolicyReportOnly,
-      'Content-Security-Policy-Report-Only'
-    )
+    const [callback, value] = getCSPDirectives(options.contentSecurityPolicyReportOnly)
     if (callback) {
       callbacks.push(callback)
     }
@@ -244,8 +238,7 @@ function getFilteredHeaders(options: SecureHeadersOptions): [string, string][] {
 }
 
 function getCSPDirectives(
-  contentSecurityPolicy: ContentSecurityPolicyOptions,
-  headerName: 'Content-Security-Policy' | 'Content-Security-Policy-Report-Only'
+  contentSecurityPolicy: ContentSecurityPolicyOptions
 ): [SecureHeadersCallback | undefined, string | string[]] {
   const callbacks: ((ctx: Context, values: string[]) => void)[] = []
   const resultValues: string[] = []
@@ -277,7 +270,10 @@ function getCSPDirectives(
     : [
         (ctx, headersToSet) =>
           headersToSet.map((values) => {
-            if (values[0] === headerName) {
+            if (
+              values[0] === 'Content-Security-Policy' ||
+              values[0] === 'Content-Security-Policy-Report-Only'
+            ) {
               const clone = values[1].slice() as unknown as string[]
               callbacks.forEach((cb) => {
                 cb(ctx, clone)
